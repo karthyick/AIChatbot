@@ -1,0 +1,9 @@
+streamlit
+langchain
+chromadb
+ transformers
+  torch
+   accelerate
+    sentence-transformers
+     redis
+      google-search-results
