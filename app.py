@@ -19,6 +19,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
+# Import JSON Compression Utility
+from shared.compression_utils import JSONCompressionUtil
 
 nltk.download('punkt_tab')
 
@@ -38,6 +40,9 @@ sentence_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 # ✅ 2️⃣ Use LangChain-compatible embeddings for ChromaDB
 embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vector_store = Chroma(client=chroma_client, collection_name="knowledge", embedding_function=embedding_function)
+
+# Initialize compression utility
+json_compressor = JSONCompressionUtil()
 
 
 def show_stored_knowledge():
@@ -209,12 +214,65 @@ def generate_response(query):
     if not context or "No knowledge stored yet." in context:
         return "No relevant knowledge found in the uploaded data."
 
-    context_text = " ".join(context)  # Combine relevant sentences
+        # --- Distill-JSON Compression for LLM Context ---
 
-    if not context_text.strip():
-        return "I couldn't generate a meaningful response. Try rephrasing your question."
+        # Convert list of strings into a structured JSON object for compression
 
-    prompt = f"Based on the following knowledge, answer concisely:\n\nContext: {context_text}\n\nQuestion: {query}\n\nAnswer:"
+        structured_context_for_compression = {"context_items": context}
+
+        
+
+        # Measure original size
+
+        original_context_json_str = json.dumps(structured_context_for_compression)
+
+        original_context_size = len(original_context_json_str.encode('utf-8'))
+
+        
+
+        # Compress the structured context
+
+        compressed_context_bytes = json_compressor.compress_for_llm(structured_context_for_compression)
+
+        
+
+        # Measure compressed size
+
+        compressed_context_size = len(compressed_context_bytes)
+
+        
+
+        # Calculate compression ratio
+
+        compression_ratio = json_compressor.get_compression_ratio(structured_context_for_compression, compressed_context_bytes)
+
+        
+
+        print(f"Distill-JSON: Original Context Size: {original_context_size} bytes")
+
+        print(f"Distill-JSON: Compressed Context Size: {compressed_context_size} bytes")
+
+        print(f"Distill-JSON: Context Compression Ratio: {compression_ratio:.2f}%")
+
+        
+
+        # Decompress to verify data integrity before using it in the prompt
+
+        decompressed_structured_context = json_compressor.decompress_response(compressed_context_bytes)
+
+        
+
+        # Reconstruct the context_text from the decompressed data
+
+        decompressed_context = decompressed_structured_context.get("context_items", [])
+
+        context_text = " ".join(decompressed_context)
+
+        # --- End Distill-JSON Compression ---
+
+    
+
+        prompt = f"Based on the following knowledge, answer concisely:\n\nContext: {context_text}\n\nQuestion: {query}\n\nAnswer:"
     print(f"📌 AI Prompt: {prompt}")
 
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda")
@@ -240,6 +298,8 @@ def generate_response(query):
 
     if len(response) < 5:
         return "I couldn't generate a meaningful response. Try rephrasing your question."
+
+
 
     return response
 

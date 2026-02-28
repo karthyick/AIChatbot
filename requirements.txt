@@ -1,9 +1,20 @@
 streamlit
 langchain
+langchain-community
 chromadb
- transformers
-  torch
-   accelerate
-    sentence-transformers
-     redis
-      google-search-results
+transformers
+torch
+accelerate
+sentence-transformers
+redis
+google-search-results
+spacy
+nltk
+networkx
+scipy
+scikit-learn
+numpy
+pandas
+pyvis
+plotly
+distill-json
